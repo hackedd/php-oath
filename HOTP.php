@@ -2,6 +2,7 @@
 
 require_once "HOTPError.php";
 require_once "bcutil.php";
+require_once "base32.php";
 
 /**
  * This class implements the algorithm outlined in RFC 4226:
@@ -173,6 +174,28 @@ class HOTP
          * counter to previous value. */
         $this->counter = $originalCounter;
         return false;
+    }
+
+    public function getUri($label, $issuer = null)
+    {
+        $type = strtolower(get_class($this));
+
+        $uri = sprintf("otpauth://%s/%s?", $type, str_replace("+", "%20", urlencode($label)));
+        $uri .= "secret=" . base32_encode($this->key);
+
+        if ($type == "hotp")
+            $uri .= "&counter=" . $this->getCounter();
+
+        if ($issuer)
+            $uri .= "&issuer=" . urlencode($issuer);
+
+        return $uri;
+    }
+
+    public function getQRUrl($label, $issuer = null)
+    {
+        $url = $this->getUri($label, $issuer);
+        return "https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=" . urlencode($url);
     }
 
     /**

@@ -108,4 +108,9 @@ class HOTPTest extends PHPUnit_Framework_TestCase
         $this->assertTrue($hotp->validate("435986"));
         $this->assertEquals("6", $hotp->getCounter());
     }
+
+    public function testBase32()
+    {
+        $this->assertEquals("JBSWY3DPEB3W64TMMQXC4LQ", base32_encode("Hello world..."));
+    }
 }
