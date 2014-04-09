@@ -1,6 +1,7 @@
 <?php
 
 require_once "HOTPError.php";
+require_once "bcutil.php";
 
 /**
  * This class implements the algorithm outlined in RFC 4226:
@@ -8,31 +9,64 @@ require_once "HOTPError.php";
  */
 class HOTP
 {
-    /* Zero as a 64-bit binary integer. */
-    const ZERO = "\x00\x00\x00\x00\x00\x00\x00\x00";
 
+    /** @var string the shared key */
     protected $key;
+
+    /** @var string the current counter (as a decimal string) */
     protected $counter;
+
+    /** @var int number of digits in OTP */
     protected $digits;
 
-    public function __construct($key, $counter = self::ZERO, $digits = 6)
+    public function __construct($key, $counter = "0", $digits = 6)
     {
         $this->key = $key;
         $this->counter = $counter;
         $this->digits = $digits;
     }
 
+    /**
+     * Get the counter as a 64-bit binary string.
+     * @return string
+     */
+    public function getBinaryCounter()
+    {
+        return bc_to_binary($this->getCounter(), 64);
+    }
+
+    /**
+     * Increment the stored counter by one.
+     */
+    public function increment()
+    {
+        $this->counter = bcadd($this->counter, "1");
+    }
+
+    /**
+     * Generate a OTP for the given counter. If the counter value is not
+     * given, the internal counter is used and incremented.
+     * @param mixed $counter
+     * @return string
+     */
     public function generate($counter = null)
     {
         if ($counter === null)
         {
-            $counter = $this->counter;
-            /* TODO: Increment counter. */
+            $counter = $this->getBinaryCounter();
+            $this->increment();
         }
 
         return self::generateOTP($this->key, $counter, $this->digits);
     }
 
+    /**
+     * Try to convert a counter value to a 64-bit binary string.
+     * The counter value can be an integer, binary string, hexadecimal string
+     * or a GMP number resource.
+     * @param mixed $counter
+     * @return string
+     */
     public static function counterToBinary($counter)
     {
         if (is_integer($counter))
@@ -57,7 +91,8 @@ class HOTP
             throw new HTOPError("Counter specified as string, but length not valid for 64-bit string.");
         }
 
-        /* TODO: Support GMP and/or BC Math numbers. */
+        if (is_resource($counter))
+            return pack("H*", gmp_strval($counter, 16));
 
         throw new HTOPError("Invalid type " . gettype($counter) . " for counter.");
     }
@@ -85,6 +120,7 @@ class HOTP
         $hs = hash_hmac("sha1", self::counterToBinary($counter), $key, true);
         $sbits = self::dynamicTruncate($hs);
         $modulo = pow(10, $digits);
+        $value = $sbits % $modulo;
 
         // printf("\nKey:   %d %s\n", strlen($key), bin2hex($key));
         // printf("Counter: %s\n", bin2hex(self::counterToBinary($counter)));
@@ -92,6 +128,6 @@ class HOTP
         // printf("SBits: %08x\n", $sbits);
         // printf("%08x %% %d => %d\n", $sbits, $modulo, $sbits % $modulo);
 
-        return $sbits % $modulo;
+        return str_pad($value, $digits, "0", STR_PAD_LEFT);
     }
 }
