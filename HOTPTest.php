@@ -83,4 +83,29 @@ class HOTPTest extends PHPUnit_Framework_TestCase
         for ($i = 0, $n = count($otps); $i < $n; $i += 1)
             $this->assertEquals($otps[$i], $hotp->generate());
     }
+
+    public function testValidate()
+    {
+        $key = hex2bin("00000000000000000000");
+        $hotp = new HOTP($key);
+
+        /* Validate C = 0 */
+        $this->assertTrue($hotp->validate("328482"));
+
+        /* Validate C = 1 */
+        $this->assertTrue($hotp->validate("812658"));
+
+        /* Incorrect OTP */
+        $this->assertFalse($hotp->validate("07334x"));
+
+        /* Validate C = 2 */
+        $this->assertTrue($hotp->validate("073348"));
+
+        /* Validate C = 2 (again) */
+        $this->assertFalse($hotp->validate("073348"));
+
+        /* Validate C = 5 (skipping 2) */
+        $this->assertTrue($hotp->validate("435986"));
+        $this->assertEquals("6", $hotp->getCounter());
+    }
 }

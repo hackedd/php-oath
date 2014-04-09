@@ -19,11 +19,78 @@ class HOTP
     /** @var int number of digits in OTP */
     protected $digits;
 
+    /** @var int window size for resynchronization protocol */
+    protected $windowSize = 5;
+
     public function __construct($key, $counter = "0", $digits = 6)
     {
         $this->key = $key;
         $this->counter = $counter;
         $this->digits = $digits;
+    }
+
+    /**
+     * @param string $counter
+     */
+    public function setCounter($counter)
+    {
+        $this->counter = $counter;
+    }
+
+    /**
+     * @return string
+     */
+    public function getCounter()
+    {
+        return $this->counter;
+    }
+
+    /**
+     * @param int $digits
+     */
+    public function setDigits($digits)
+    {
+        $this->digits = $digits;
+    }
+
+    /**
+     * @return int
+     */
+    public function getDigits()
+    {
+        return $this->digits;
+    }
+
+    /**
+     * @param string $key
+     */
+    public function setKey($key)
+    {
+        $this->key = $key;
+    }
+
+    /**
+     * @return string
+     */
+    public function getKey()
+    {
+        return $this->key;
+    }
+
+    /**
+     * @param int $windowSize
+     */
+    public function setWindowSize($windowSize)
+    {
+        $this->windowSize = $windowSize;
+    }
+
+    /**
+     * @return int
+     */
+    public function getWindowSize()
+    {
+        return $this->windowSize;
     }
 
     /**
@@ -58,6 +125,28 @@ class HOTP
         }
 
         return self::generateOTP($this->key, $counter, $this->digits);
+    }
+
+    /**
+     * Try to validate the user input against the current OTP.
+     * If validation fails, the counter is not incremented.
+     * @param string $input
+     * @return boolean
+     */
+    public function validate($input)
+    {
+        $originalCounter = $this->counter;
+        for ($i = 0; $i < $this->windowSize; $i += 1)
+        {
+            $otp = $this->generate();
+            if ($otp === $input)
+                return true;
+        }
+
+        /* Validation of the OTP failed even after resynchronization, reset
+         * counter to previous value. */
+        $this->counter = $originalCounter;
+        return false;
     }
 
     /**
