@@ -9,6 +9,9 @@ require_once "bcutil.php";
  */
 class HOTP
 {
+    const SHA1 = "sha1";
+    const SHA256 = "sha256";
+    const SHA512 = "sha512";
 
     /** @var string the shared key */
     protected $key;
@@ -21,6 +24,13 @@ class HOTP
 
     /** @var int window size for resynchronization protocol */
     protected $windowSize = 5;
+
+    /**
+     * The hash function to use for the HMAC. HOTP implementations should use
+     * SHA-1. SHA-256 and SHA-512 may be used for TOTP.
+     * @var string
+     */
+    protected $hash = self::SHA1;
 
     public function __construct($key, $counter = "0", $digits = 6)
     {
@@ -94,6 +104,22 @@ class HOTP
     }
 
     /**
+     * @param string $hash
+     */
+    public function setHash($hash)
+    {
+        $this->hash = $hash;
+    }
+
+    /**
+     * @return string
+     */
+    public function getHash()
+    {
+        return $this->hash;
+    }
+
+    /**
      * Get the counter as a 64-bit binary string.
      * @return string
      */
@@ -124,7 +150,7 @@ class HOTP
             $this->increment();
         }
 
-        return self::generateOTP($this->key, $counter, $this->digits);
+        return self::generateOTP($this->key, $counter, $this->digits, $this->hash);
     }
 
     /**
@@ -189,24 +215,22 @@ class HOTP
     public static function dynamicTruncate($string)
     {
         /*
-         * DT(String) // String = String[0]...String[19]
-         *   Let OffsetBits be the low-order 4 bits of String[19]
+         * DT(String) // String = String[0]...String[n-1]
+         *   Let OffsetBits be the low-order 4 bits of String[n-1]
          *   Offset = StToNum(OffsetBits) // 0 <= OffSet <= 15
          *   Let P = String[OffSet]...String[OffSet+3]
          *   Return the Last 31 bits of P
          */
-        if (strlen($string) != 20)
-            throw new HTOPError("DT input should be 160 bits");
 
-        $offset = ord($string[19]) & 0x0F;
+        $offset = ord(substr($string, -1)) & 0x0F;
         $p = substr($string, $offset, 4);
         $v = unpack("N", $p);
         return $v[1] & 0x7FFFFFFF;
     }
 
-    public static function generateOTP($key, $counter, $digits = 6)
+    public static function generateOTP($key, $counter, $digits = 6, $hashAlgo = "sha1")
     {
-        $hs = hash_hmac("sha1", self::counterToBinary($counter), $key, true);
+        $hs = hash_hmac($hashAlgo, self::counterToBinary($counter), $key, true);
         $sbits = self::dynamicTruncate($hs);
         $modulo = pow(10, $digits);
         $value = $sbits % $modulo;
